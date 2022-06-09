@@ -1,0 +1,196 @@
+```{r packages}
+library(reticulate)
+library(SingleCellExperiment)
+```
+
+```{python packages}
+import numpy as np
+```
+
+```{r load data}
+datasets <-  readRDS(file="mRNAmix_norm.Rds") 
+CELseq2 <- datasets[[1]]
+Sortseq <- datasets[[2]]
+```
+
+```{python pca}
+from sklearn.decomposition import PCA
+def pca_py(X,n_components):
+  pca = PCA(n_components = int(n_components))
+  X_pca = pca.fit_transform(X)
+  return X_pca
+```
+
+```{R pca}
+pca_r <- function(sce,n_components){
+  metadata(sce)$dr_method = "pca"
+  tp = system.time({
+    mat <- t(logcounts(sce))
+    mat_pca = py$pca_py(r_to_py(mat),n_components)
+    reducedDim(sce,"PCA") <- mat_pca
+  })
+  metadata(sce)$running_time = unname(tp)[1]
+  return(sce)
+}
+```
+
+```{python tsne}
+from sklearn.manifold import TSNE
+def tsne_py(X,n_components):
+  tsne = TSNE(n_components = int(n_components))
+  X_tsne = tsne.fit_transform(X)
+  return X_tsne
+```
+
+```{R tsne}
+tsne_r <- function(sce,n_components){
+  metadata(sce)$dr_method = "tsne"
+  tp = system.time({
+    mat <- t(logcounts(sce))
+    mat_tsne = py$tsne_py(r_to_py(mat),n_components)
+    reducedDim(sce,"TSNE") <- mat_tsne
+  })
+  metadata(sce)$running_time = unname(tp)[1]
+  return(sce)
+}
+```
+
+```{python isomap}
+from sklearn.manifold import Isomap
+def isomap_py(X,n_components):
+  isomap = Isomap(n_components = int(n_components))
+  X_isomap = isomap.fit_transform(X)
+  return X_isomap
+```
+
+```{R isomap}
+isomap_r <- function(sce,n_components){
+  metadata(sce)$dr_method = "isomap"
+  tp = system.time({
+    mat <- t(logcounts(sce))
+    mat_isomap = py$isomap_py(r_to_py(mat),n_components)
+    reducedDim(sce,"Isomap") <- mat_isomap
+  })
+  metadata(sce)$running_time = unname(tp)[1]
+  return(sce)
+}
+```
+
+```{python ica}
+from sklearn.decomposition import FastICA
+def ica_py(X,n_components):
+  ica = FastICA(n_components=int(n_components))
+  X_ica = ica.fit_transform(X)
+  return X_ica
+```
+
+```{R ica}
+ica_r <- function(sce,n_components){
+  metadata(sce)$dr_method = "ica"
+  tp = system.time({
+    mat <- t(logcounts(sce))
+    mat_ica = py$ica_py(r_to_py(mat),n_components)
+    reducedDim(sce,"ica") <- mat_ica
+  })
+  metadata(sce)$running_time = unname(tp)[1]
+  return(sce)
+}
+```
+
+```{python poly}
+from sklearn.decomposition import KernelPCA
+def poly_py(X,n_components):
+  poly = KernelPCA(n_components=int(n_components), kernel='poly')
+  X_poly = poly.fit_transform(X)
+  return X_poly
+```
+
+```{R poly}
+poly_r <- function(sce,n_components){
+  metadata(sce)$dr_method = "poly"
+  tp = system.time({
+    mat <- t(logcounts(sce))
+    mat_poly = py$poly_py(r_to_py(mat),n_components)
+    reducedDim(sce,"poly") <- mat_poly
+  })
+  metadata(sce)$running_time = unname(tp)[1]
+  return(sce)
+}
+```
+
+```{python rbf}
+def rbf_py(X,n_components):
+  rbf = KernelPCA(n_components=int(n_components), kernel='rbf')
+  X_rbf = rbf.fit_transform(X)
+  return X_rbf
+```
+
+```{R rbf}
+rbf_r <- function(sce,n_components){
+  metadata(sce)$dr_method = "rbf"
+  tp = system.time({
+    mat <- t(logcounts(sce))
+    mat_rbf = py$rbf_py(r_to_py(mat),n_components)
+    reducedDim(sce,"rbf") <- mat_rbf
+  })
+  metadata(sce)$running_time = unname(tp)[1]
+  return(sce)
+}
+```
+
+```{python umap}
+import umap
+def umap_py(X,n_components):
+  X_umap = umap.UMAP(n_components=int(n_components)).fit_transform(X)
+  return X_umap
+```
+
+```{R umap}
+umap_r <- function(sce,n_components){
+  metadata(sce)$dr_method = "umap"
+  tp = system.time({
+    mat <- t(logcounts(sce))
+    mat_umap = py$umap_py(r_to_py(mat),n_components)
+    reducedDim(sce,"umap") <- mat_umap
+  })
+  metadata(sce)$running_time = unname(tp)[1]
+  return(sce)
+}
+```
+
+```{r call methods}
+all_methods <- list(pca_r,tsne_r,isomap_r,ica_r,poly_r,rbf_r,umap_r)
+
+names(all_methods) <- c("pca","tsne","isomap","ica","poly","rbf","umap")
+
+call_method <- function(method){
+  all_methods[method]
+}
+
+DimReduction <- function(datasets,methods,n_components){
+  if (methods=="all"){
+    dr_methods <- all_methods
+  }
+  else{
+    dr_methods <- lapply(methods,call_method)
+  }
+  for (data in datasets) {
+    for (method in dr_methods) {
+      res <- method(data,n_components)
+      if (exists("DRsce")) {
+        DRsce = c(DRsce,list(res))
+      }
+      else {
+        DRsce = list(res)
+      }
+    }
+  }
+  return(DRsce)
+}
+```
+
+```{r run}
+n_components = 3
+
+DRsce <- DimReduction(datasets,"all",n_components)
+```

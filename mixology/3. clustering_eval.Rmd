@@ -1,0 +1,91 @@
+```{python cluster}
+from sklearn.cluster import KMeans
+def cluster_py(X,n_clusters):
+  X_cluster = KMeans(n_clusters=int(n_clusters)).fit(X)
+  return X_cluster
+```
+
+```{R cluster}
+cluster_r <- function(sce,n_clusters){
+  mat <- reducedDim(sce)
+  mat_cluster <- py$cluster_py(r_to_py(mat),n_clusters)
+  sce$clustering_res <- mat_cluster$labels_
+  return(sce)
+}
+```
+
+```{python import}
+from sklearn.metrics.cluster import normalized_mutual_info_score
+from sklearn.metrics.cluster import adjusted_rand_score
+from sklearn.metrics.cluster import silhouette_score
+from sklearn.metrics.cluster import calinski_harabasz_score
+from sklearn.metrics.cluster import davies_bouldin_score
+```
+
+```{R nmi}
+nmi_r <- function(sce){
+  score <- py$normalized_mutual_info_score(r_to_py(sce$clustering_res),r_to_py(sce$group))
+  return(round(score,3))
+}
+```
+
+```{R ari}
+ari_r <- function(sce){
+  score <- py$adjusted_rand_score(r_to_py(sce$clustering_res),r_to_py(sce$group))
+  return(round(score,3))
+}
+```
+
+```{R silhouette}
+silhouette_r <- function(sce){
+  mat <- reducedDim(sce)
+  score <- py$silhouette_score(r_to_py(mat),r_to_py(sce$clustering_res))
+  return(round(score,3))
+}
+```
+
+```{R calinski_harabasz}
+calinski_harabasz_r <- function(sce){
+  mat <- reducedDim(sce)
+  score <- py$calinski_harabasz_score(r_to_py(mat),r_to_py(sce$clustering_res))
+  return(round(score))
+}
+```
+
+```{R davies_bouldin}
+davies_bouldin_r <- function(sce){
+  mat <- reducedDim(sce)
+  score <- py$davies_bouldin_score(r_to_py(mat),r_to_py(sce$clustering_res))
+  return(round(score,3))
+}
+```
+
+```{R run}
+n_clusters = 5
+
+DReval <- function(DRsce,n_clusters) {
+  Clres = lapply(DRsce,cluster_r,n_clusters=n_clusters)
+  for (sce in DRsce) {
+    sce_df <- data.frame(seq_method=metadata(sce)$seq_method,
+                        dr_method=metadata(sce)$dr_method,
+                        time=metadata(sce)$running_time)
+    if (exists("DRbench")) {
+      DRbench = rbind(DRbench,sce_df)
+    }
+    else {
+      DRbench = sce_df
+    }
+  }
+  DRbench$NMI = lapply(Clres,nmi_r)
+  DRbench$ARI = lapply(Clres,ari_r)
+  DRbench$silhouette = lapply(Clres,silhouette_r)
+  DRbench$calinski_harabasz = lapply(Clres,calinski_harabasz_r)
+  DRbench$davies_bouldin = lapply(Clres,davies_bouldin_r)
+  return(DRbench)
+}
+
+
+
+
+
+```
